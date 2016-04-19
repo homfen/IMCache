@@ -36,7 +36,7 @@
                 if (now < expire) {
                     return data.value;
                 }
-                remove(hashKey);
+                remove(key, options);
             }
             return null;
         }
@@ -75,14 +75,16 @@
          * remove 根据key移除相应数据
          *
          * @param {string} key 键
+         * @param {Object} options 附加参数
          */
-        function remove(key) {
-            delete _cache[key];
+        function remove(key, options) {
+            var hashKey = getKey(key, options);
+            delete _cache[hashKey];
             setSize();
         }
 
         /**
-         * remove 清除所有数据
+         * clear 清除所有数据
          */
         function clear() {
             _cache = {};
