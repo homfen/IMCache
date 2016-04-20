@@ -33,7 +33,7 @@
             if (data) {
                 var now = (new Date()).getTime();
                 var expire = data.expire + data.timestamp;
-                if (now < expire) {
+                if (!data.expire || now < expire) {
                     return data.value;
                 }
                 remove(key, options);
