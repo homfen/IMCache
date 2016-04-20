@@ -74,12 +74,29 @@
         /**
          * remove 根据key移除相应数据
          *
-         * @param {string} key 键
+         * @param {string | Function | RegExp} key 键字符串|过滤函数|正则
          * @param {Object} options 附加参数
          */
         function remove(key, options) {
-            var hashKey = getKey(key, options);
-            delete _cache[hashKey];
+            var keys = [];
+            var keyType = getType(key);
+            switch (keyType) {
+                case 'String':
+                    keys.push(getKey(key, options));
+                    break;
+                case 'Function':
+                    keys = key(_cache);
+                    break;
+                case 'RegExp':
+                    keys = filterByRegexp(key);
+                    break;
+                default:
+                    keys.push(getKey(key, options));
+                    break;
+            }
+            keys.forEach(function (hashKey) {
+                delete _cache[hashKey];
+            });
             setSize();
         }
 
@@ -223,6 +240,35 @@
          */
         function getKey(key, options) {
             return 'Key' + getHash(key + (options ? JSON.stringify(options) : ''));
+        }
+
+        /**
+         * 通过正则筛选数据
+         *
+         * @param {RegExp} reg 正则
+         * @return {Array} hashKey数组
+         */
+        function filterByRegexp(reg) {
+            var hashKeys = [];
+            for (var hashKey in _cache) {
+                if (_cache.hasOwnProperty(hashKey)) {
+                    var data = _cache[hashKey];
+                    if (reg.test(data.key)) {
+                        hashKeys.push(hashKey);
+                    }
+                }
+            }
+            return hashKeys;
+        }
+
+        /**
+         * 获取类型
+         *
+         * @param {Object} obj 对象
+         * @return {string} 类型
+         */
+        function getType(obj) {
+            return Object.prototype.toString.call(obj).slice(8, -1);
         }
 
         return {

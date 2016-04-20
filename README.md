@@ -38,7 +38,7 @@ update 更新数据(不会更新过期时间)
 
 remove 根据key移除相应数据
 
-@param {string} key 键
+@param {string | Function | RegExp} key 键字符串|过滤函数|正则
 
 #### clear()
 
