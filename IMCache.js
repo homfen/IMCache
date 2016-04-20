@@ -18,7 +18,7 @@
 })(this,
     function () {
         var _cache = {};
-        var _size = 0;
+        var _size = '0';
 
         /**
          * get 获取数据
@@ -105,7 +105,7 @@
          */
         function clear() {
             _cache = {};
-            _size = 0;
+            _size = '0';
         }
 
         /**
@@ -142,7 +142,7 @@
         /**
          * 获取cache总大小
          *
-         * @return {number} 总大小
+         * @return {string} 总大小
          */
         function getSize() {
             return _size;

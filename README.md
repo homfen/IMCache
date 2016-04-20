@@ -48,5 +48,3 @@ remove 清除所有数据
 
 获取cache总大小
 
-@return {number} 总大小
-
