@@ -1,7 +1,7 @@
 /**
  * @file IMCache
  * @author homfen(homfen@outlook.com)
- * @version 0.0.1
+ * @version 0.0.2
  */
 'use strict'
 
@@ -24,19 +24,12 @@
          * get 获取数据
          *
          * @param {string} key 键
-         * @param {Object} options 附加参数
          * @return {Object} 保存的对象
          */
-        function get(key, options) {
-            var hashKey = getKey(key, options);
-            var data = _cache[hashKey];
+        function get(key) {
+            var data = getData(key);
             if (data) {
-                var now = (new Date()).getTime();
-                var expire = data.expire + data.timestamp;
-                if (!data.expire || now < expire) {
-                    return data.value;
-                }
-                remove(key, options);
+                return data.value;
             }
             return null;
         }
@@ -46,12 +39,13 @@
          *
          * @param {string} key 键
          * @param {Object} value 值
-         * @param {number} expire 过期时间(ms)
          * @param {Object} options 附加参数
+         * @param {number} options.expire 过期时间(ms)
+         * @param {Array} options.dependencies 依赖
          */
-        function set(key, value, expire, options) {
-            var hashKey = getKey(key, options);
-            _cache[hashKey] = initData(key, value, expire, options);
+        function set(key, value, options) {
+            var hashKey = getKey(key);
+            _cache[hashKey] = initData(key, value, options);
             setSize();
         }
 
@@ -60,10 +54,9 @@
          *
          * @param {string} key 键
          * @param {Object} value 值
-         * @param {Object} options 附加参数
          */
-        function update(key, value, options) {
-            var hashKey = getKey(key, options);
+        function update(key, value) {
+            var hashKey = getKey(key);
             var data = _cache[hashKey];
             if (data) {
                 updateData(data, value);
@@ -77,23 +70,8 @@
          * @param {string | Function | RegExp} key 键字符串|过滤函数|正则
          * @param {Object} options 附加参数
          */
-        function remove(key, options) {
-            var keys = [];
-            var keyType = getType(key);
-            switch (keyType) {
-                case 'String':
-                    keys.push(getKey(key, options));
-                    break;
-                case 'Function':
-                    keys = key(_cache);
-                    break;
-                case 'RegExp':
-                    keys = filterByRegexp(key);
-                    break;
-                default:
-                    keys.push(getKey(key, options));
-                    break;
-            }
+        function remove(key) {
+            var keys = getDependencies(key);
             keys.forEach(function (hashKey) {
                 delete _cache[hashKey];
             });
@@ -109,20 +87,44 @@
         }
 
         /**
-         * 初始化数据，添加过期时间等
+         * get 获取数据
+         *
+         * @param {string} key 键
+         * @return {Object} 保存的对象
+         */
+        function getData(key) {
+            var hashKey = getKey(key);
+            var data = _cache[hashKey];
+            if (data) {
+                var expire = data.options && data.options.expire;
+                if (expire) {
+                    var now = (new Date()).getTime();
+                    expire += data.timestamp;
+                    if (now >= expire) {
+                        remove(key);
+                        return null;
+                    }
+                }
+                return data;
+            }
+            return null;
+        }
+
+        /**
+         * 初始化数据
          *
          * @param {string} key 键
          * @param {Object} value 值
-         * @param {number} expire 过期时间(ms)
          * @param {Object} options 附加参数
+         * @param {number} options.expire 过期时间(ms)
+         * @param {Array} options.dependencies 依赖
          * @return {Object} 修饰过的数据
          */
-        function initData(key, value, expire, options) {
+        function initData(key, value, options) {
             return {
                 key: key,
                 value: value,
                 timestamp: (new Date()).getTime(),
-                expire: expire || 0,
                 options: options,
                 changed: false
             };
@@ -235,11 +237,10 @@
          * 获取key
          *
          * @param {string} key 键
-         * @param {Object} options 附加参数
          * @return {string} 计算过的key
          */
-        function getKey(key, options) {
-            return 'Key' + getHash(key + (options ? JSON.stringify(options) : ''));
+        function getKey(key) {
+            return 'Key' + getHash(key);
         }
 
         /**
@@ -259,6 +260,39 @@
                 }
             }
             return hashKeys;
+        }
+
+        /**
+         * 获取所有的依赖
+         *
+         * @param {string | RegExp} key 键|正则
+         * @return {Array} hashKey数组
+         */
+        function getDependencies(key) {
+            var allDependencies = [];
+            var topKeys = [];
+            var keyType = getType(key);
+            switch (keyType) {
+                case 'String':
+                    topKeys.push(getKey(key));
+                    break;
+                case 'RegExp':
+                    topKeys = filterByRegexp(key);
+                    break;
+                default:
+                    topKeys.push(getKey(key));
+                    break;
+            }
+            allDependencies = allDependencies.concat(topKeys);
+            topKeys.forEach(function (hashKey) {
+                var data = _cache[hashKey];
+                if (data && data.options && data.options.dependencies) {
+                    data.options.dependencies.forEach(function (dependency) {
+                        allDependencies = allDependencies.concat(getDependencies(dependency));
+                    });
+                }
+            });
+            return allDependencies;
         }
 
         /**
