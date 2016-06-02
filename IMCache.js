@@ -1,7 +1,7 @@
 /**
  * @file IMCache
  * @author homfen(homfen@outlook.com)
- * @version 0.0.2
+ * @version 0.1.0
  */
 'use strict'
 
@@ -19,6 +19,7 @@
     function () {
         var _cache = {};
         var _size = '0';
+        var _ws = {};
 
         /**
          * get 获取数据
@@ -41,12 +42,16 @@
          * @param {Object} value 值
          * @param {Object} options 附加参数
          * @param {number} options.expire 过期时间(ms)
-         * @param {Array} options.dependencies 依赖
+         * @param {Array} options.relatedCacheKeys 依赖
+         * @param {string} options.ws WebSocket地址
          */
         function set(key, value, options) {
             var hashKey = getKey(key);
             _cache[hashKey] = initData(key, value, options);
             setSize();
+            if (options.ws) {
+                initWS(options.ws);
+            }
         }
 
         /**
@@ -71,7 +76,7 @@
          * @param {Object} options 附加参数
          */
         function remove(key) {
-            var keys = getDependencies(key);
+            var keys = getRelatedCacheKeys(key);
             keys.forEach(function (hashKey) {
                 delete _cache[hashKey];
             });
@@ -117,7 +122,7 @@
          * @param {Object} value 值
          * @param {Object} options 附加参数
          * @param {number} options.expire 过期时间(ms)
-         * @param {Array} options.dependencies 依赖
+         * @param {Array} options.relatedCacheKeys 依赖
          * @return {Object} 修饰过的数据
          */
         function initData(key, value, options) {
@@ -268,8 +273,8 @@
          * @param {string | RegExp} key 键|正则
          * @return {Array} hashKey数组
          */
-        function getDependencies(key) {
-            var allDependencies = [];
+        function getRelatedCacheKeys(key) {
+            var allRelatedCacheKeys = [];
             var topKeys = [];
             var keyType = getType(key);
             switch (keyType) {
@@ -283,16 +288,16 @@
                     topKeys.push(getKey(key));
                     break;
             }
-            allDependencies = allDependencies.concat(topKeys);
+            allRelatedCacheKeys = allRelatedCacheKeys.concat(topKeys);
             topKeys.forEach(function (hashKey) {
                 var data = _cache[hashKey];
-                if (data && data.options && data.options.dependencies) {
-                    data.options.dependencies.forEach(function (dependency) {
-                        allDependencies = allDependencies.concat(getDependencies(dependency));
+                if (data && data.options && data.options.relatedCacheKeys) {
+                    data.options.relatedCacheKeys.forEach(function (relatedCacheKey) {
+                        allRelatedCacheKeys = allRelatedCacheKeys.concat(getRelatedCacheKeys(relatedCacheKey));
                     });
                 }
             });
-            return allDependencies;
+            return allRelatedCacheKeys;
         }
 
         /**
@@ -303,6 +308,35 @@
          */
         function getType(obj) {
             return Object.prototype.toString.call(obj).slice(8, -1);
+        }
+
+        /**
+         * 初始化ws
+         *
+         * @param {string} url WebSocket地址
+         */
+        function initWS(url) {
+            if (!_ws[url]) {
+                try {
+                    var ws = new WebSocket(url);
+                    ws.onopen = function () {
+                        _ws[url] = ws;
+                    };
+                    ws.onerror = function () {
+                        // console.log('WebSocket(' + url + ') init failed.');
+                    };
+                    ws.onclose = function () {
+                        delete _ws[url];
+                    };
+                    ws.onmessage = function (event) {
+                        var key = event.data;
+                        remove(key);
+                    };
+                }
+                catch (ex) {
+                    // console.log('You browser does not support WebSocket.');
+                }
+            }
         }
 
         return {
