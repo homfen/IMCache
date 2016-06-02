@@ -329,7 +329,11 @@
                         delete _ws[url];
                     };
                     ws.onmessage = function (event) {
-                        var key = event.data;
+                        var data = JSON.parse(event.data);
+                        var key = data.key;
+                        if (data.type === 'RegExp') {
+                            key = new RegExp(key);
+                        }
                         remove(key);
                     };
                 }
